@@ -7,6 +7,8 @@ import { EventsCard } from "@/components/financials/PlatformCards";
 import { Card } from "@/components/ui";
 import { attention } from "@/lib/financials/attention";
 import { runFarm } from "@/lib/financials/farm";
+import { householdTax } from "@/lib/financials/tax";
+import TaxDueCard from "@/components/financials/TaxDueCard";
 import { ADVISOR, getViewer } from "@/lib/session";
 import BiddyBox from "@/components/BiddyBox";
 import { suggestionsFor } from "@/lib/biddy-suggestions";
@@ -72,6 +74,17 @@ export default async function DashboardPage() {
         </Card>
         <EventsCard data={farm.events} />
       </div>
+
+      {results.payments && (
+        <TaxDueCard
+          payments={results.payments}
+          thisYear={householdTax(farm, results.tax)}
+          taxCash={results.taxCash}
+          cashMonths={results.cf.status === "ok" ? results.cf.result.months : null}
+          year={farm.year}
+          compact
+        />
+      )}
 
       {note != null && (
         <Card title={`Your notes on ${farm.profile.farm_name}`} subtitle={`Only you see these — not ${farm.profile.name.split(" ")[0]}.`}>
