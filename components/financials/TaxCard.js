@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import { formatCurrency } from "@/lib/format/currency";
+import { dayLabel } from "@/lib/format/date";
 
 const eur = (v) => formatCurrency(v);
 const REGIME = { general: "general rate", young_trained_farmer: "young trained farmer rate", registered_partnership: "partnership rate" };
@@ -10,6 +11,99 @@ const CAPS = {
   stock_relief_general_cap: "the stock relief cap",
   state_aid_young_farmer_lifetime: "the lifetime young farmer aid limit",
 };
+
+const Block = ({ title, children }) => (
+  <div className="rounded-lg bg-stone-50 px-3 py-2">
+    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{title}</p>
+    <div className="mt-1 space-y-1 text-sm text-stone-700">{children}</div>
+  </div>
+);
+const Unconfirmed = ({ children }) => <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-[11px] text-amber-900">{children}</span>;
+
+/**
+ * What tax.estimate explains since engine 1.11.0 (ADR-0055), each block only when the engine returns it: income
+ * averaging, losses, pension relief, the home carer credit and a step-out deferral. Engine fields only.
+ */
+function TaxDetails({ e, year }) {
+  const a = e.averaging;
+  const l = e.losses;
+  const p = e.pension;
+  const hc = e.home_carer;
+  const so = e.step_out;
+  const lossesShown = l && (l.brought_forward > 0 || l.this_year_loss > 0);
+  if (!a && !lossesShown && !p && !hc && !so) return null;
+  return (
+    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      {a && (
+        <Block title={`Averaged over ${a.years} years`}>
+          <p className="flex flex-wrap gap-x-3 text-xs text-stone-600">
+            {a.profits_before_allowances.map((v, i) => (
+              <span key={i} className="tabular-nums">
+                {year - a.years + 1 + i}: {eur(v)}
+              </span>
+            ))}
+          </p>
+          <p>
+            Average <strong className="tabular-nums">{eur(a.averaged_profit)}</strong>, less this year’s capital allowances of {eur(a.capital_allowances)}: you’re taxed on{" "}
+            <strong className="tabular-nums">{eur(a.assessable_profit)}</strong>.
+          </p>
+          <p className="text-xs text-stone-500">Profits before capital allowances. The step-by-step table above is this year on its own.</p>
+        </Block>
+      )}
+      {lossesShown && (
+        <Block title="Farm losses">
+          {l.brought_forward > 0 && (
+            <p>
+              {eur(l.used)} of the {eur(l.brought_forward)} carried forward used this year; <strong>{eur(l.carried_forward)}</strong> left for next year.
+            </p>
+          )}
+          {l.this_year_loss > 0 && <p>This year makes a loss of {eur(l.this_year_loss)}: it’s carried forward too.</p>}
+          {l.lost_by_stock_relief > 0 && (
+            <p className="text-xs text-stone-600">
+              {eur(l.lost_by_stock_relief)} of the losses can’t be carried forward: in a year you claim stock relief, losses left unused are lost.
+            </p>
+          )}
+          {l.prsi_treatment === "reduced_unconfirmed" && (
+            <p className="text-xs text-stone-600">
+              Losses also reduce PRSI here <Unconfirmed>PRSI treatment not confirmed by Revenue</Unconfirmed>
+            </p>
+          )}
+        </Block>
+      )}
+      {p && (
+        <Block title="Pension relief">
+          <p>
+            Relief of <strong className="tabular-nums">{eur(p.relief)}</strong> on {eur(p.contributions)} paid in: at {p.age} you can claim up to {p.age_pct}% of your farm earnings (
+            {eur(p.limit)}). It lowers income tax only, not USC or PRSI.
+          </p>
+          {p.unrelieved > 0 && <p className="text-xs text-stone-600">{eur(p.unrelieved)} over the limit carries forward to next year.</p>}
+          {p.earnings_basis === "assessable_farm_profit" && a && (
+            <p className="text-xs text-stone-600">
+              Earnings taken as your averaged farm profit <Unconfirmed>our reading, not confirmed by Revenue</Unconfirmed>
+            </p>
+          )}
+        </Block>
+      )}
+      {hc && (
+        <Block title="Home carer credit">
+          <p>
+            {hc.applied === "credit"
+              ? `Home carer credit of ${eur(hc.credit_after_taper)} given: better for you than the bigger tax band a second income brings.`
+              : `The home carer credit would be ${eur(hc.credit_after_taper)}, but the bigger tax band for your spouse’s income is worth more, so that’s used instead.`}
+          </p>
+        </Block>
+      )}
+      {so && (
+        <Block title="Stepping out this year">
+          <p>
+            Taxed on this year’s own profit. {eur(so.deferred_income_tax)} of income tax is put off, paid in {so.instalments.length} parts:{" "}
+            {so.instalments.map((i) => `${eur(i.amount)} on ${dayLabel(i.due)} ${i.due.slice(0, 4)}`).join(", ")}.
+          </p>
+        </Block>
+      )}
+    </div>
+  );
+}
 
 /** Before the tax questions are answered: what's still needed, nothing assumed. */
 export function TaxQuestions({ year, left }) {
@@ -48,7 +142,9 @@ export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiv
   const fra = tax.vat?.status === "ok" ? tax.vat.result.total.addition : 0;
   const company = e.business_type === "company";
   const caps = [...(ca?.caps_not_applied ?? []), ...sr.caps_not_applied].map((c) => CAPS[c] ?? c.replaceAll("_", " "));
-  const announced = [ca, sr, e, tax.vat?.result].some((r) => r?.rules_applied?.some((rule) => rule.status === "announced"));
+  const status = (s) => [ca, sr, e, tax.vat?.result].some((r) => r?.rules_applied?.some((rule) => rule.status === s));
+  const announced = status("announced");
+  const practice = status("practice");
   const row = (label, value, o = {}) => (
     <tr key={label} className={o.strong ? "border-t border-stone-200 font-semibold" : "text-stone-700"}>
       <td className={`py-1 ${o.sub ? "pl-4 text-stone-500" : ""}`}>{label}</td>
@@ -104,6 +200,8 @@ export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiv
                 <>
                   {row("Assessment", e.assessment === "joint" ? "Joint, with your spouse" : "On your own", { sub: true })}
                   {e.income.spouse_paye_income > 0 && row("Your spouse’s wages included", eur(e.income.spouse_paye_income), { sub: true })}
+                  {e.income.spouse_self_employed_income > 0 && row("Your spouse’s business profit included", eur(e.income.spouse_self_employed_income), { sub: true })}
+                  {e.income.spouse_farm_wages > 0 && row("Wages the farm pays your spouse", eur(e.income.spouse_farm_wages), { sub: true })}
                   {row("Income tax", eur(e.income_tax.net))}
                   {row("after tax credits of", eur(e.income_tax.credits), { sub: true })}
                   {row("USC", eur(e.usc.total))}
@@ -116,12 +214,15 @@ export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiv
         </div>
       </div>
 
+      <TaxDetails e={e} year={year} />
+
       <p className="mt-4 text-xs text-stone-500">
         {yearEndGiven
           ? "Uses the herd and stock values you expect at 31 December."
           : "Uses your latest herd and stock values as the 31 December values: add what you expect in Farm data for a better estimate."}
         {caps.length > 0 && ` Not checked yet: ${caps.join(", ")}.`}
-        {announced && " Some rates are Budget announcements, not yet law."} Change your tax details in{" "}
+        {announced && " Some rates are Budget announcements, not yet law."}
+        {practice && " Some rules are Revenue practice, not law."} Change your tax details in{" "}
         <Link href="/farm-data" className="underline">
           Farm data
         </Link>
