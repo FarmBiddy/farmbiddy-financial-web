@@ -36,7 +36,7 @@ export default async function ReportsPage({ searchParams }) {
   if (!hasRecords(farm)) return <EmptyState title="Reports" what="Reports for your bank, advisor and accountant." />;
   const locked = kind === "bank" && !pro; // the bank report is Pro
 
-  const { inputs, cf, cap } = await runFarm(farm);
+  const { farm: withFra, inputs, cf, cap } = await runFarm(farm);
   // Borrowing capacity over the full year (actual + forecast), the same debt.capacity run as Farm Financials,
   // rather than the bundle's actual-period figure, so the bank report and the page agree.
   const capacity = cap?.status === "ok" ? cap.result : null;
@@ -44,7 +44,7 @@ export default async function ReportsPage({ searchParams }) {
     kind === "advisor" ? WHAT_IF_PRESETS.filter((p) => ADVISOR_SCENARIOS.includes(p.id)).map((p) => ({ name: p.label, ...p.shock })) : [];
   const response =
     cf.status === "ok"
-      ? await runReport(kind, buildReportInput(farm, inputs, scenarios))
+      ? await runReport(kind, buildReportInput(withFra, inputs, scenarios))
       : { status: "error", error: { message: "The farm's cash flow couldn't be calculated." } };
   const rep = response.status === "ok" ? response.result : null;
 

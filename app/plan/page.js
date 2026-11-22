@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { planTaxProfile } from "@/lib/financials/tax";
+import { householdTax, planTaxProfile } from "@/lib/financials/tax";
 import EmptyState from "@/components/EmptyState";
 import { hasRecords } from "@/lib/farm-fields";
 import { Badge, Card } from "@/components/ui";
@@ -64,8 +64,10 @@ export default async function PlanPage({ searchParams }) {
   const invIds = [].concat(sp.inv ?? []);
   const investments = (farm.plan_investments ?? []).filter((i) => invIds.includes(i.id));
 
-  // Tax per year from the farmer's tax answers when given (engine ADR-0053); else the preset's flat tax figure.
-  const taxProfile = planTaxProfile(farm);
+  // `withFra`: the farm with the flat-rate VAT addition on its months (runFarm); the plan's base months come from it.
+  const { farm: withFra, inputs, cf, tax } = await runFarm(farm);
+  // Tax per year from the farmer's tax answers when given (engine ADR-0053 / ADR-0055); else the preset's flat tax figure.
+  const taxProfile = planTaxProfile(farm, householdTax(farm, tax)?.amount ?? null);
   const { tax: presetTax, ...presetAssumptions } = preset.assumptions;
   const assumptions = {
     ...(taxProfile ? presetAssumptions : preset.assumptions),
@@ -76,11 +78,10 @@ export default async function PlanPage({ searchParams }) {
     ...(carried.herd == null ? {} : { herd_pct: [carried.herd] }),
   };
 
-  const { inputs, cf } = await runFarm(farm);
   const response =
     cf.status === "ok"
       ? await planProjection(
-          buildPlanInput(farm, inputs, cf.result, {
+          buildPlanInput(withFra, inputs, cf.result, {
             assumptions,
             years: YEARS,
             investments: investments.map(({ id, name, note, ...inv }) => inv),
@@ -90,7 +91,7 @@ export default async function PlanPage({ searchParams }) {
       : { status: "error", error: { message: "This year's cash flow couldn't be calculated, so there's no starting balance." } };
   const plan = response.status === "ok" ? response.result : null;
   // €PM-style year ahead: year 1 with nothing changed (= the last 12 months) and with the milk price only.
-  const yearOne = (a) => planProjection(buildPlanInput(farm, inputs, cf.result, { assumptions: a, years: 1, investments: [] }));
+  const yearOne = (a) => planProjection(buildPlanInput(withFra, inputs, cf.result, { assumptions: a, years: 1, investments: [] }));
   const [unchanged, priceOnly] = plan
     ? await Promise.all([yearOne({}), yearOne(assumptions.milk_price ? { milk_price: assumptions.milk_price } : {})])
     : [];

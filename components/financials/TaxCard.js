@@ -44,6 +44,8 @@ export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiv
   const n = tax.net.result;
   const ca = tax.allowances?.status === "ok" ? tax.allowances.result : null;
   const sr = tax.relief.result;
+  // The flat-rate addition is in the profit since engine 1.11.0 (a P&L line), so it's shown inside it, not added again.
+  const fra = tax.vat?.status === "ok" ? tax.vat.result.total.addition : 0;
   const company = e.business_type === "company";
   const caps = [...(ca?.caps_not_applied ?? []), ...sr.caps_not_applied].map((c) => CAPS[c] ?? c.replaceAll("_", " "));
   const announced = [ca, sr, e, tax.vat?.result].some((r) => r?.rules_applied?.some((rule) => rule.status === "announced"));
@@ -82,8 +84,8 @@ export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiv
           <table className="mt-1 w-full text-sm">
             <tbody>
               {row("Profit before tax", eur(n.net_profit_before_tax))}
+              {fra > 0 && row("of which flat-rate VAT on milk and cattle", eur(fra), { sub: true })}
               {ca && row("Depreciation added back", `+ ${eur(ca.profit_bridge.add_back_depreciation)}`, { sub: true })}
-              {ca && ca.profit_bridge.flat_rate_addition > 0 && row("Flat-rate VAT on milk and cattle", `+ ${eur(ca.profit_bridge.flat_rate_addition)}`, { sub: true })}
               {ca && row("Capital allowances on machinery and buildings", `− ${eur(ca.profit_bridge.capital_allowances)}`, { sub: true })}
               {row("Taxable profit", eur(sr.trading_profit), { strong: true })}
               {row(`Stock relief (${REGIME[sr.regime] ?? sr.regime})`, `− ${eur(sr.relief)}`, { sub: true })}
