@@ -19,9 +19,9 @@ const chip = (tone, text) => <span className={`rounded-full px-1.5 text-[10px] f
 
 /**
  * One number. `locked`: why this viewer can't change it, shown instead of the hint.
- * `cents`: typed in c/litre, saved in €/litre (the "c:" name prefix).
+ * `signed`: takes negatives (no min). `cents`: typed in c/litre, saved in €/litre (the "c:" name prefix).
  */
-function Field({ name, label, unit, step = "1", value, edited, hint, optional, min = "0", locked, cents }) {
+function Field({ name, label, unit, step = "1", value, edited, hint, optional, min = "0", signed, locked, cents }) {
   // the farm-file path behind the input name ("c:year.pl.milk_price" → "pl.milk_price"), to see if the engine needs it
   const needed = NEEDED[name.replace(/^c:/, "").replace(/^(year|months\.\d+)\./, "").replace(/_pct$/, "")];
   return (
@@ -43,7 +43,7 @@ function Field({ name, label, unit, step = "1", value, edited, hint, optional, m
         data-label={label}
         type="number"
         step={cents ? "0.01" : step}
-        min={min}
+        min={signed ? undefined : min}
         required={!optional && value != null && value !== ""}
         disabled={!!locked}
         defaultValue={value ?? ""}
@@ -258,7 +258,7 @@ export default async function FarmDataPage({ searchParams }) {
               edited={"opening_cash" in edits}
               locked={lock("opening_cash")}
               optional
-              min={undefined}
+              signed
               hint={farm.opening_cash == null ? "Needed for your cash flow: from your 1 January bank statement" : "From your 1 January bank statement"}
             />
           </div>
