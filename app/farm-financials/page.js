@@ -2,6 +2,7 @@ import { loadFarm } from "@/lib/farm-edits";
 import TaxCard, { TaxQuestions } from "@/components/financials/TaxCard";
 import { householdTax, taxPaymentQuestionsLeft, taxQuestionsLeft } from "@/lib/financials/tax";
 import TaxDueCard from "@/components/financials/TaxDueCard";
+import ReconcileCard from "@/components/financials/ReconcileCard";
 import EmptyState from "@/components/EmptyState";
 import { hasRecords } from "@/lib/farm-fields";
 import { Badge, Card } from "@/components/ui";
@@ -41,7 +42,7 @@ export default async function FarmFinancialsPage({ searchParams }) {
   const { pro, role } = await getViewer();
 
   // `withFra`: the farm with the flat-rate VAT addition on its months (runFarm), for every later engine call.
-  const { farm: withFra, inputs, loans, plf, kpi, cap, cff, cf, tax, payments, taxCash } = await runFarm(farm, (fn, input) => withProvided(fn, params, input));
+  const { farm: withFra, inputs, loans, plf, kpi, cap, cff, cf, tax, payments, taxCash, recon } = await runFarm(farm, (fn, input) => withProvided(fn, params, input));
   // Money in / out so far and where it came from / went: this year's actual months vs the same months last year.
   const cfc = farm.prior_year?.length ? await cfCompare(buildCfCompareInput(withFra)) : null;
 
@@ -130,6 +131,12 @@ export default async function FarmFinancialsPage({ searchParams }) {
           cashMonths={cf.status === "ok" ? cf.result.months : null}
           year={farm.year}
         />
+      )}
+
+      {recon && (
+        <ProLock pro={pro} title="Why is my cash different from my profit?" value="See how your profit turns into cash: milk paid a month late, merchant credit, herd value. What banks and accountants check first.">
+          <ReconcileCard response={recon} farm={farm} />
+        </ProLock>
       )}
 
       {risk && (

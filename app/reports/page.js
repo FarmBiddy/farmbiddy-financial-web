@@ -11,6 +11,7 @@ import { DAIRY_COSTS } from "@/lib/benchmarks";
 import PrintButton from "@/components/reports/PrintButton";
 import ProLock from "@/components/ProLock";
 import { getViewer } from "@/lib/session";
+import { CashBridge } from "@/components/financials/ReconcileCard";
 import {
   AdvisorInShort, BankInShort, Capacity, Cash, CashFlow, Comparison, CostBreakdown, FixedAssets, Headline, Kpis, Loans, NetProfit, ProfitAndLoss, Section, Sensitivity, BalanceSheet, period,
 } from "@/components/reports/Sections";
@@ -36,7 +37,7 @@ export default async function ReportsPage({ searchParams }) {
   if (!hasRecords(farm)) return <EmptyState title="Reports" what="Reports for your bank, advisor and accountant." />;
   const locked = kind === "bank" && !pro; // the bank report is Pro
 
-  const { farm: withFra, inputs, cf, cap } = await runFarm(farm);
+  const { farm: withFra, inputs, cf, cap, recon } = await runFarm(farm);
   // Borrowing capacity over the full year (actual + forecast), the same debt.capacity run as Farm Financials,
   // rather than the bundle's actual-period figure, so the bank report and the page agree.
   const capacity = cap?.status === "ok" ? cap.result : null;
@@ -122,6 +123,17 @@ export default async function ReportsPage({ searchParams }) {
           <FixedAssets fa={rep.fixed_assets} meta={farm.assets} />
           <BalanceSheet bs={rep.balance_sheet} />
           <CashFlow cf={rep.cash_flow} p={rep.period} />
+          {recon?.status === "ok" && (
+            <Section title="From profit to cash" note={`${farm.year}, actual and forecast months · cf.reconcile`}>
+              <CashBridge
+                r={recon.result}
+                given={{
+                  milk: farm.year_end?.milk_owed_start != null || farm.year_end?.milk_owed_end != null,
+                  merchant: farm.year_end?.merchant_credit_start != null || farm.year_end?.merchant_credit_end != null,
+                }}
+              />
+            </Section>
+          )}
         </>
       )}
 
