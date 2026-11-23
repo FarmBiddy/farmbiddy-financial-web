@@ -243,7 +243,7 @@ export function Capacity({ c }) {
           ["Operating Surplus", c.operating_surplus],
           c.off_farm_income ? ["Off-farm income", c.off_farm_income, { indent: true }] : null,
           ["Household drawings", -c.drawings, { indent: true }],
-          ["Tax", -c.tax, { indent: true }],
+          [`Tax (${c.tax_source === "accountant" ? "accountant’s figure" : c.tax_source === "estimate" ? "FarmBiddy estimate" : "none given"})`, -c.tax, { indent: true }],
           ["Repayment capacity", c.repayment_capacity, { strong: true }],
           ["Current loan repayments", c.debt_service],
           ["Cover after drawings & tax", num(c.repayment_cover, 2, "×"), { raw: true }],
@@ -255,6 +255,22 @@ export function Capacity({ c }) {
           c.new_loan && ["Its monthly payment", c.new_loan.monthly_payment_at_max, { indent: true }],
         ]}
       />
+      {c.filed && (
+        <>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
+            On the filed accounts, average of {c.filed.tax_years.join(", ")}
+          </p>
+          <Rows
+            rows={[
+              ["Surplus before finance (net profit + depreciation + interest)", c.filed.average_surplus],
+              ["Tax (from the returns)", -c.filed.average_tax, { indent: true }],
+              ["Repayment capacity", c.filed.repayment_capacity, { strong: true }],
+              ["Cover after drawings & tax", num(c.filed.repayment_cover, 2, "×"), { raw: true }],
+              ["Largest new loan", c.filed.new_loan.max_principal, { strong: true }],
+            ]}
+          />
+        </>
+      )}
     </Section>
   );
 }

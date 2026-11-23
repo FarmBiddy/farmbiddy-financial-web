@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import EngineGate from "@/components/financials/EngineGate";
 import { formatCurrency } from "@/lib/format/currency";
@@ -20,6 +21,65 @@ function Line({ label, value, sign = "", strong = false, hint }) {
         {hint && <span className="block pl-4 text-[11px] font-normal text-stone-400">{hint}</span>}
       </dt>
       <dd className="tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+/** Whose tax figure the engine used (debt.capacity echoes tax_source, ADR-0055). */
+export const taxSource = (s) => (s === "accountant" ? "your accountant’s figure" : s === "estimate" ? "our estimate" : "none given");
+const times = (v) => (v == null ? "—" : `${v.toLocaleString("en-IE", { maximumFractionDigits: 2 })}×`);
+
+/**
+ * Banks read the last 3 years of filed accounts: debt.capacity's `filed` view next to this year's (the engine doesn't
+ * choose between them, and neither do we). Without filed accounts, a pointer to add them.
+ */
+function FiledSideBySide({ r, money }) {
+  const f = r.filed;
+  if (!f) {
+    return (
+      <p className="mt-3 text-xs text-stone-500">
+        Banks also read your last 3 years of filed accounts.{" "}
+        <Link href="/farm-data" className="underline">
+          Add them in Farm data
+        </Link>{" "}
+        to see the loan on those too.
+      </p>
+    );
+  }
+  const years = f.tax_years.length > 1 ? `${f.tax_years[0]}–${f.tax_years.at(-1)}` : String(f.tax_years[0]);
+  const rows = [
+    ["Money for repayments, a year", money(r.repayment_capacity), money(f.repayment_capacity)],
+    ["Safety cushion", times(r.repayment_cover), times(f.repayment_cover)],
+    ["Largest new loan", money(r.new_loan.max_principal), money(f.new_loan.max_principal)],
+    ["Tax taken off", `${money(r.tax)} (${taxSource(r.tax_source)})`, `${money(f.average_tax)} a year (your returns)`],
+  ];
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead className="text-left text-stone-500">
+          <tr>
+            <th className="py-1 font-medium" />
+            <th className="py-1 pl-2 text-right font-medium">
+              {r.to.year === new Date().getFullYear() ? "On this year’s figures" : "On your latest figures"}
+              <span className="block font-normal">{periodLabel(r)}</span>
+            </th>
+            <th className="py-1 pl-2 text-right font-medium">
+              On your filed accounts
+              <span className="block font-normal">average of {years}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-stone-100 tabular-nums text-stone-700">
+          {rows.map(([label, a, b]) => (
+            <tr key={label} className={label === "Largest new loan" ? "font-semibold text-stone-900" : ""}>
+              <td className="py-1">{label}</td>
+              <td className="py-1 pl-2 text-right">{a}</td>
+              <td className="py-1 pl-2 text-right">{b}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[11px] text-stone-500">Both with today’s loans and family drawings. A bank looks at both; neither is the “right” one.</p>
     </div>
   );
 }
@@ -77,7 +137,7 @@ export default function BorrowCard({ response, actualOnly = false, other = null,
                 <Line label="The farm’s money left after farm costs" value={money(r.operating_surplus)} />
                 {r.off_farm_income ? <Line sign="+" label="Income from off the farm" value={money(r.off_farm_income)} /> : null}
                 <Line sign="−" label="Family drawings" value={money(r.drawings)} />
-                <Line sign="−" label="Tax" value={money(r.tax)} />
+                <Line sign="−" label={`Tax (${taxSource(r.tax_source)})`} value={money(r.tax)} />
                 <Line strong label="Money available for loan repayments, a year" value={money(r.repayment_capacity)} />
                 <Line sign="−" label="Loans you already repay, a year" value={money(r.debt_service)} />
                 <Line
@@ -87,6 +147,8 @@ export default function BorrowCard({ response, actualOnly = false, other = null,
                   hint="after keeping the safety cushion banks ask for (below)"
                 />
               </dl>
+
+              <FiledSideBySide r={r} money={money} />
 
               {cushion != null && (
                 <div className="mt-4">
