@@ -123,7 +123,7 @@ export function TaxQuestions({ year, left }) {
  * The year's tax from the engine's tax chain (lib/financials/tax.js), in the order the engine works it out:
  * profit → taxable profit → stock relief → income tax, USC, PRSI. Every figure is a field of one of the steps.
  */
-export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiven }) {
+export default function TaxCard({ tax, year, accountantTax, lastYear, herdValued, stockGiven }) {
   const failed = ["net", "relief", "estimate"].map((k) => tax[k]).find((r) => r && r.status !== "ok");
   if (failed || !tax.estimate) {
     return (
@@ -217,9 +217,10 @@ export default function TaxCard({ tax, year, accountantTax, lastYear, yearEndGiv
       <TaxDetails e={e} year={year} />
 
       <p className="mt-4 text-xs text-stone-500">
-        {yearEndGiven
-          ? "Uses the herd and stock values you expect at 31 December."
-          : "Uses your latest herd and stock values as the 31 December values: add what you expect in Farm data for a better estimate."}
+        {herdValued
+          ? "The herd at 31 December is your herd groups at Revenue-practice values."
+          : "The herd at 31 December is your latest herd value: add your herd groups in Farm data for a better estimate."}{" "}
+        {stockGiven ? "Stock is what you expect at 31 December." : "Stock is your latest value."}
         {caps.length > 0 && ` Not checked yet: ${caps.join(", ")}.`}
         {announced && " Some rates are Budget announcements, not yet law."}
         {practice && " Some rules are Revenue practice, not law."} Change your tax details in{" "}

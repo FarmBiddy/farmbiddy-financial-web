@@ -514,16 +514,6 @@ export default async function FarmDataPage({ searchParams }) {
           {sub("This year")}
           <div className="grid gap-4 sm:grid-cols-3">
             <Field
-              name="tax.year_end_livestock"
-              label={`Herd value you expect at 31 Dec ${farm.year}`}
-              unit="€"
-              value={farm.tax?.year_end_livestock}
-              optional
-              edited={"tax.year_end_livestock" in edits}
-              locked={lock("tax.year_end_livestock")}
-              hint={farm.balance_sheet?.livestock != null ? `Leave empty to use your latest value (€${farm.balance_sheet.livestock.toLocaleString("en-IE")})` : "For stock relief"}
-            />
-            <Field
               name="tax.year_end_stock"
               label={`Feed, fertiliser and fuel in stock at 31 Dec ${farm.year}`}
               unit="€"

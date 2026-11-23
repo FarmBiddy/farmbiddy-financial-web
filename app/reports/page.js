@@ -12,6 +12,7 @@ import PrintButton from "@/components/reports/PrintButton";
 import ProLock from "@/components/ProLock";
 import { getViewer } from "@/lib/session";
 import { CashBridge } from "@/components/financials/ReconcileCard";
+import { HerdTable } from "@/components/financials/HerdCard";
 import {
   AdvisorInShort, BankInShort, Capacity, Cash, CashFlow, Comparison, CostBreakdown, FixedAssets, Headline, Kpis, Loans, NetProfit, ProfitAndLoss, Section, Sensitivity, BalanceSheet, period,
 } from "@/components/reports/Sections";
@@ -37,7 +38,7 @@ export default async function ReportsPage({ searchParams }) {
   if (!hasRecords(farm)) return <EmptyState title="Reports" what="Reports for your bank, advisor and accountant." />;
   const locked = kind === "bank" && !pro; // the bank report is Pro
 
-  const { farm: withFra, inputs, cf, cap, recon } = await runFarm(farm);
+  const { farm: withFra, inputs, cf, cap, recon, herd } = await runFarm(farm);
   // Borrowing capacity over the full year (actual + forecast), the same debt.capacity run as Farm Financials,
   // rather than the bundle's actual-period figure, so the bank report and the page agree.
   const capacity = cap?.status === "ok" ? cap.result : null;
@@ -104,6 +105,14 @@ export default async function ReportsPage({ searchParams }) {
               <Capacity c={capacity ?? rep.capacity} />
             </div>
             <BalanceSheet bs={rep.balance_sheet} />
+            {herd?.status === "ok" && (
+              <Section
+                title={`Herd at 31 December ${farm.year}`}
+                note={`Market value ${formatCurrency(herd.result.total.market_value)} · Revenue practice ${formatCurrency(herd.result.total.revenue_practice_value)} (used for profit and tax) · herd.valuation`}
+              >
+                <HerdTable r={herd.result} />
+              </Section>
+            )}
             <Cash cash={rep.cash} />
           </div>
         </ProLock>

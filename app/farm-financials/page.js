@@ -3,6 +3,7 @@ import TaxCard, { TaxQuestions } from "@/components/financials/TaxCard";
 import { householdTax, taxPaymentQuestionsLeft, taxQuestionsLeft } from "@/lib/financials/tax";
 import TaxDueCard from "@/components/financials/TaxDueCard";
 import ReconcileCard from "@/components/financials/ReconcileCard";
+import HerdCard from "@/components/financials/HerdCard";
 import EmptyState from "@/components/EmptyState";
 import { hasRecords } from "@/lib/farm-fields";
 import { Badge, Card } from "@/components/ui";
@@ -42,7 +43,7 @@ export default async function FarmFinancialsPage({ searchParams }) {
   const { pro, role } = await getViewer();
 
   // `withFra`: the farm with the flat-rate VAT addition on its months (runFarm), for every later engine call.
-  const { farm: withFra, inputs, loans, plf, kpi, cap, cff, cf, tax, payments, taxCash, recon } = await runFarm(farm, (fn, input) => withProvided(fn, params, input));
+  const { farm: withFra, inputs, loans, plf, kpi, cap, cff, cf, tax, payments, taxCash, recon, herd } = await runFarm(farm, (fn, input) => withProvided(fn, params, input));
   // Money in / out so far and where it came from / went: this year's actual months vs the same months last year.
   const cfc = farm.prior_year?.length ? await cfCompare(buildCfCompareInput(withFra)) : null;
 
@@ -116,7 +117,8 @@ export default async function FarmFinancialsPage({ searchParams }) {
           year={farm.year}
           accountantTax={farm.household?.tax_per_year ?? null}
           lastYear={farm.tax?.last_year && { year: farm.tax.last_year, tax: farm.tax.last_year_tax, taxable: farm.tax.last_year_taxable_profit }}
-          yearEndGiven={farm.tax?.year_end_livestock != null || farm.tax?.year_end_stock != null}
+          herdValued={herd?.status === "ok"}
+          stockGiven={farm.tax?.year_end_stock != null}
         />
       ) : (
         taxQuestionsLeft(farm).length > 0 && <TaxQuestions year={farm.year} left={taxQuestionsLeft(farm)} />
@@ -132,6 +134,8 @@ export default async function FarmFinancialsPage({ searchParams }) {
           year={farm.year}
         />
       )}
+
+      {herd && <HerdCard response={herd} input={inputs["herd.valuation"]} year={farm.year} />}
 
       {recon && (
         <ProLock pro={pro} title="Why is my cash different from my profit?" value="See how your profit turns into cash: milk paid a month late, merchant credit, herd value. What banks and accountants check first.">
