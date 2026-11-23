@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { householdTax, planTaxProfile } from "@/lib/financials/tax";
+import { householdTax, planTaxProfile, planTaxQuestionsLeft, taxQuestionsLeft } from "@/lib/financials/tax";
 import EmptyState from "@/components/EmptyState";
 import { hasRecords } from "@/lib/farm-fields";
 import { Badge, Card } from "@/components/ui";
@@ -96,6 +96,16 @@ export default async function PlanPage({ searchParams }) {
     ? await Promise.all([yearOne({}), yearOne(assumptions.milk_price ? { milk_price: assumptions.milk_price } : {})])
     : [];
   const last = plan?.years.at(-1);
+  // What a year's tax payment is made of (plan.projection tax.payments), for the "Tax paid" cell's tooltip.
+  const paidNote = (y) => {
+    const p = y.tax?.payments;
+    if (!p) return undefined;
+    return [
+      `Paid in ${p.pay_year}: preliminary tax ${formatCurrency(p.preliminary)} for ${p.pay_year}`,
+      `+ ${formatCurrency(p.balance_previous_year)} left of ${p.pay_year - 1}`,
+      ...(p.refund_previous_year ? [`${formatCurrency(p.refund_previous_year)} of ${p.pay_year - 1} comes back`] : []),
+    ].join(" ");
+  };
   const lowest = (pick) => plan?.years.reduce((a, b) => (pick(b) != null && (pick(a) == null || pick(b) < pick(a)) ? b : a));
   const lowDscr = lowest((y) => y.debt.dscr);
   const lowCash = lowest((y) => y.cash.closing);
@@ -293,7 +303,11 @@ export default async function PlanPage({ searchParams }) {
                         ["Cost of production", (y) => `${fmt(y.kpis.costs_per_litre_c)}c/L`],
                         ...(taxProfile
                           ? [
-                              ["Tax", (y) => formatCurrency(y.tax?.total_tax ?? y.cash.tax)],
+                              ["Tax for the year", (y) => formatCurrency(y.tax?.total_tax ?? y.cash.tax)],
+                              // Paid on the Irish dates (ADR-0055): each October's preliminary + last year's balance
+                              ["Tax paid (Oct / Nov)", (y) => formatCurrency(y.cash.tax), null, null, paidNote],
+                              ...(plan.years.some((y) => y.cash.tax_refund > 0) ? [["Tax refund", (y) => (y.cash.tax_refund ? formatCurrency(y.cash.tax_refund) : "—")]] : []),
+                              ["Tax owed at year end (approx.)", (y) => formatCurrency(y.balance_sheet.tax_owed)],
                               ["Tax rules", (y) => (y.tax?.rules_basis === "latest_held_constant" ? `at ${y.tax.tax_year > 2027 ? "2027" : y.tax.tax_year} rates` : `${y.tax?.tax_year ?? ""} rates`), "assumption"],
                               ["Drawings", (y) => formatCurrency(y.cash.drawings)],
                             ]
@@ -303,11 +317,11 @@ export default async function PlanPage({ searchParams }) {
                         ["Debt at year end", (y) => formatCurrency(y.debt.closing_balance)],
                         ["Loan cover", (y) => (y.debt.dscr == null ? "—" : `${fmt(y.debt.dscr, 2)}×`), null, (y) => y.flags.below_min_cover],
                         ["Net worth", (y) => formatCurrency(y.balance_sheet.net_worth), "strong"],
-                      ].map(([label, cell, kind, bad]) => (
+                      ].map(([label, cell, kind, bad, note]) => (
                         <tr key={label} className={kind === "strong" ? "font-semibold" : kind === "assumption" ? "text-stone-500" : "text-stone-700"}>
                           <td className="py-1.5">{label}</td>
                           {plan.years.map((y) => (
-                            <td key={y.year} className={`py-1.5 text-right ${bad?.(y) ? "text-red-700" : ""}`}>
+                            <td key={y.year} title={note?.(y)} className={`py-1.5 text-right ${bad?.(y) ? "text-red-700" : ""} ${note?.(y) ? "cursor-help underline decoration-dotted" : ""}`}>
                               {bad?.(y) && <span aria-hidden>⚠ </span>}
                               {cell(y)}
                             </td>
@@ -319,8 +333,10 @@ export default async function PlanPage({ searchParams }) {
                 </div>
                 <p className="mt-3 text-xs text-stone-500">
                   {taxProfile
-                    ? `Tax is worked out for each year from your tax details${taxProfile.income_averaging ? ", with income averaging" : ""}${plan.years.some((y) => y.tax?.averaging === "insufficient_history") ? " (not enough history to average yet)" : ""}; later years use the latest announced rates. `
-                    : <>Tax is a flat {formatCurrency(presetTax?.[0] ?? 0)} a year from the scenario. <Link href="/farm-data" className="underline">Answer the tax questions</Link> to have it worked out each year. </>}
+                    ? `Tax is worked out for each year from your tax details${taxProfile.income_averaging ? ", with income averaging" : ""}${plan.years.some((y) => y.tax?.averaging === "insufficient_history") ? " (not enough history to average yet)" : ""}; later years use the latest announced rates. It’s paid the Irish way: each October / November, this year’s preliminary tax and what’s left of last year’s, so cash pays one year’s tax while the next builds up as tax owed (hover a “Tax paid” figure to see what it’s made of). `
+                    : <>Tax is a flat {formatCurrency(presetTax?.[0] ?? 0)} a year from the scenario.{" "}
+                        <Link href="/farm-data" className="underline">Answer the tax questions</Link>
+                        {[...taxQuestionsLeft(farm), ...planTaxQuestionsLeft(farm)].length ? ` (still needed: ${[...taxQuestionsLeft(farm), ...planTaxQuestionsLeft(farm)].join(", ")})` : ""} to have it worked out each year. </>}
                   Grey rows are the assumptions used. Year-end figures hide seasonal dips: the spring overdraft can still happen inside a year
                   — see the{" "}
                   <Link href="/farm-financials" className="underline">

@@ -2,6 +2,78 @@
   "_note": "Mock agents for the demo user. Each intent runs ONE engine function with the request's inputs and fills {paths} from the engine result. `variants` pick a text by the sign of engine values (e.g. cash answers say No when the forecast is overdrawn).",
   "intents": [
     {
+      "id": "tax_due",
+      "agent": "finance",
+      "match": [
+        "tax due",
+        "tax bill",
+        "preliminary",
+        "tax this autumn",
+        "october tax",
+        "november tax",
+        "pay revenue",
+        "owe revenue",
+        "tax in october",
+        "tax in november",
+        "tax is due",
+        "tax to pay",
+        "tax will i pay",
+        "tax do i pay",
+        "tax do i owe"
+      ],
+      "function": "tax.payments",
+      "show": "tax_due",
+      "missing_text": "I need your preliminary tax answers first: how you work it out, and last year’s tax and what you paid for it. Add them in Farm data.",
+      "text": "About {result.due_on_pay_date} is due this autumn (31 October, or the ROS date in mid-November): {result.preliminary.amount} of preliminary tax for this year and {result.preceding_year.balance_due} left of last year’s. The lowest preliminary tax that avoids interest would be {result.lowest_safe.amount}. It’s an estimate: confirm it with your accountant.",
+      "follow_ups": [
+        "Will I have cash for the December feed bill?",
+        "Why is my cash different from my profit?"
+      ]
+    },
+    {
+      "id": "cash_vs_profit",
+      "agent": "finance",
+      "match": [
+        "cash different",
+        "cash lower",
+        "less cash",
+        "cash less",
+        "why is my cash",
+        "cash and profit",
+        "cash vs profit",
+        "profit to cash",
+        "profit but"
+      ],
+      "function": "cf.reconcile",
+      "show": "cash_vs_profit",
+      "missing_text": "I need a full year of figures to compare your profit with your cash.",
+      "text": "This year your accounts show a profit of {result.accounts_operating_profit}; the months should show {result.expected_operating_cash} of farm cash and they show {result.actual_operating_cash}. The gap is things that aren’t cash or are paid later: herd value {result.bridge.herd_value_change}, stock value {result.bridge.stock_value_change}, milk paid a month late {result.bridge.milk_debtors} and merchant credit {result.bridge.merchant_credit}. Not explained: {result.unexplained}.",
+      "follow_ups": [
+        "What’s my herd worth?",
+        "Am I profitable this year?"
+      ]
+    },
+    {
+      "id": "herd_value",
+      "agent": "finance",
+      "match": [
+        "herd worth",
+        "herd value",
+        "value of my herd",
+        "herd valuation",
+        "cows worth",
+        "value my herd"
+      ],
+      "function": "herd.valuation",
+      "show": "herd_value",
+      "missing_text": "Add your herd groups (head and value a head) under Year end in Farm data and I can value it.",
+      "text": "At market value your herd at 31 December is worth {result.total.market_value}. On Revenue practice, the value used for your profit and tax, it’s {result.total.revenue_practice_value}. A bank looks at the market value.",
+      "follow_ups": [
+        "How much tax is due this autumn?",
+        "How much more could I borrow?"
+      ]
+    },
+    {
       "id": "borrow",
       "agent": "finance",
       "match": [
