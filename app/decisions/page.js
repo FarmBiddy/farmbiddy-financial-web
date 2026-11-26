@@ -8,6 +8,9 @@ import { loadFarm } from "@/lib/farm-edits";
 import { formatCurrency } from "@/lib/format/currency";
 import ProLock from "@/components/ProLock";
 import { getViewer } from "@/lib/session";
+import { runFarm } from "@/lib/financials/farm";
+import { averagingDecisions } from "@/lib/financials/tax";
+import AveragingDecisions from "@/components/financials/AveragingDecisions";
 
 export const metadata = { title: "Decisions · FarmBiddy" };
 
@@ -98,6 +101,9 @@ export default async function DecisionsPage({ searchParams }) {
         })
       : null;
   const ia = appraisal?.status === "ok" ? appraisal.result : null;
+  // Income averaging decisions, only for a farmer in averaging (hidden otherwise): this year's tax from the engine chain.
+  const averagingTax = farm.tax?.income_averaging === "elected" ? (await runFarm(farm)).tax : null;
+  const averaging = averagingTax ? await averagingDecisions(farm, averagingTax) : null;
   const money = (v) => formatCurrency(v, pb?.currency);
   const input = "w-full rounded-lg border border-stone-300 px-3 py-2";
 
@@ -340,6 +346,13 @@ export default async function DecisionsPage({ searchParams }) {
             <Link href={`/plan?inv=${inv.id}`} className="inline-block text-sm font-medium text-emerald-800 hover:underline">
               {simple ? "Can you afford it?" : `Can ${first} afford it?`} See it in the 5-year plan →
             </Link>
+          )}
+
+          {averaging && (
+            <>
+              <h2 className="pt-4 text-lg font-semibold tracking-tight">Income averaging</h2>
+              <AveragingDecisions decisions={averaging} estimate={averagingTax.estimate.result} year={farm.year} />
+            </>
           )}
         </div>
       </ProLock>

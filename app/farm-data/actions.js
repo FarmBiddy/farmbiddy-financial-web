@@ -53,8 +53,8 @@ async function writeEdits(formData) {
     const rule = ruleFor(path);
     if (!rule || !canEdit(role, farmId, path)) continue;
     const text = raw.trim();
-    if (rule.choices) {
-      // a pick from a list (tax profile): kept as text
+    if (rule.choices && (rule.choices.includes(text) || rule.min == null)) {
+      // a pick from a list (tax profile): kept as text. With a range too (a year or "never"), a number goes below.
       if (!rule.choices.includes(text)) continue;
       if (text === effectiveValue(getFarm(farmId), path)) delete edits[path];
       else edits[path] = text;

@@ -19,6 +19,23 @@ assert.deepEqual(
   { opening_cash: -5000, milking_cows: null, "months.9.lines.feed": 6000 },
 );
 assert.deepEqual(cleanEdits([1, 2]), {});
+
+// engine 1.11.0 answers: a year or "never", words only, herd groups listed by name
+assert.deepEqual(
+  cleanEdits({
+    "tax.last_step_out_year": "never",
+    "tax.preliminary_basis": "prior_100",
+    "tax.home_carer": "maybe", // not a choice
+    "tax.direct_debit_start_month": 13, // out of range
+    "herd.dairy_cows.held": 1200,
+    "herd.__proto__.head": 1, // not a group
+    "year_end.merchant_credit_end": 41000,
+  }),
+  { "tax.last_step_out_year": "never", "tax.preliminary_basis": "prior_100", "herd.dairy_cows.held": 1200, "year_end.merchant_credit_end": 41000 },
+);
+assert.deepEqual(cleanEdits({ "tax.last_step_out_year": 2021 }), { "tax.last_step_out_year": 2021 });
+assert.deepEqual(cleanEdits({ "tax.last_step_out_year": 1990 }), {});
+assert.deepEqual(applyEdits({ months: [] }, { "herd.heifers.head": 25 }).herd, { heifers: { head: 25 } });
 assert.deepEqual(cleanEdits(null), {});
 
 // applying

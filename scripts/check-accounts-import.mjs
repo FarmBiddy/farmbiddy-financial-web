@@ -20,6 +20,10 @@ assert.equal(edits["balance_sheet.livestock_opening_value"], joe.balance_sheet.l
 assert.equal(edits["tax.grant.parlour"], 54000, "grant matched though the PDF says 'and' and the register '&'");
 assert.equal(edits["tax.allowance.feeder"], "plant");
 assert.equal(edits["tax.last_year_tax"], 28392);
+assert.equal(edits["tax.past_tax.2025"], 28392);
+assert.equal(edits["tax.filed_net_profit.2025"], 74731);
+assert.equal(edits["tax.filed_depreciation.2025"], 11492);
+assert.equal(edits["tax.filed_interest.2025"], 3856);
 assert.equal(edits["tax.prior_profit.2022"], 61240);
 assert.equal(edits["tax.income_averaging"], "not_elected", "read, not assumed");
 // a year the farm isn't starting from: its closing balances are not this year's opening

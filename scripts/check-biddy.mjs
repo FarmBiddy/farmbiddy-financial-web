@@ -30,3 +30,15 @@ const borrowIntent = fixtures.intents.find((i) => i.id === "borrow");
 assert.match(pickTemplate(borrowIntent, { status: "ok", result: { new_loan: { max_principal: 0 } } }), /^Not at the moment/);
 assert.match(pickTemplate(borrowIntent, { status: "ok", result: { new_loan: { max_principal: 120000 } } }), /^Based on/);
 console.log("biddy variants ok");
+
+// routing (lib/biddy.js mockAgent: first intent whose match is in the question): the engine 1.11.0 questions reach
+// their own function, not the general cash / profit answers
+const route = (q) => fixtures.intents.find((i) => i.match.some((m) => q.toLowerCase().includes(m)))?.function;
+assert.equal(route("How much tax is due this autumn?"), "tax.payments");
+assert.equal(route("What's my preliminary tax?"), "tax.payments");
+assert.equal(route("Why is my cash different from my profit?"), "cf.reconcile");
+assert.equal(route("Why is my cash lower than my profit?"), "cf.reconcile");
+assert.equal(route("What’s my herd worth?"), "herd.valuation");
+assert.equal(route("Will I have cash for the December feed bill?"), "cf.months");
+assert.equal(route("Am I profitable this year?"), "pl.months");
+console.log("biddy routing ok");

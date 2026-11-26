@@ -1,7 +1,9 @@
 import { loadFarm } from "@/lib/farm-edits";
-import { vatFlatRate } from "@/lib/financial-engine/client";
 import TaxCard, { TaxQuestions } from "@/components/financials/TaxCard";
-import { householdTax, taxQuestionsLeft } from "@/lib/financials/tax";
+import { householdTax, taxPaymentQuestionsLeft, taxQuestionsLeft } from "@/lib/financials/tax";
+import TaxDueCard from "@/components/financials/TaxDueCard";
+import ReconcileCard from "@/components/financials/ReconcileCard";
+import HerdCard from "@/components/financials/HerdCard";
 import EmptyState from "@/components/EmptyState";
 import { hasRecords } from "@/lib/farm-fields";
 import { Badge, Card } from "@/components/ui";
@@ -40,12 +42,10 @@ export default async function FarmFinancialsPage({ searchParams }) {
   if (!hasRecords(farm)) return <EmptyState title="Farm Financials" what="Money in, money out and what’s left, month by month." />;
   const { pro, role } = await getViewer();
 
-  const { inputs, loans, plf, kpi, cap, cff, cf, tax } = await runFarm(farm, (fn, input) => withProvided(fn, params, input));
+  // `withFra`: the farm with the flat-rate VAT addition on its months (runFarm), for every later engine call.
+  const { farm: withFra, inputs, loans, plf, kpi, cap, cff, cf, tax, payments, taxCash, recon, herd } = await runFarm(farm, (fn, input) => withProvided(fn, params, input));
   // Money in / out so far and where it came from / went: this year's actual months vs the same months last year.
-  const cfc = farm.prior_year?.length ? await cfCompare(buildCfCompareInput(farm)) : null;
-  // Flat-rate VAT addition on this year's actual sales, only once the farmer has said they're a flat-rate farmer.
-  const actualMonths = inputs["pl.months"]?.months.filter((m) => m.year === farm.year && m.month <= farm.actual_through_month) ?? [];
-  const flatRate = farm.tax?.vat === "flat_rate" && actualMonths.length ? await vatFlatRate({ months: actualMonths, vat_registered: false }) : null;
+  const cfc = farm.prior_year?.length ? await cfCompare(buildCfCompareInput(withFra)) : null;
 
   const asOf = monthLabel(farm.actual_through_month);
   // Say which month / loan a nested needs_input path points at, from the request that was sent.
@@ -58,7 +58,7 @@ export default async function FarmFinancialsPage({ searchParams }) {
   const forecastIssue = [plf, cff].find((r) => r && r.status !== "ok");
   // New loan: sized on what actually happened (last 12 months and last year), never the forecast; the
   // lower of the two is the answer, the other is shown for context. Without a year of records: the year incl. forecast.
-  const historic = await Promise.all(buildHistoricDebtCapacityInputs(farm, householdTax(farm, tax)).map(async ({ key, input }) => ({ key, response: await debtCapacity(input) })));
+  const historic = await Promise.all(buildHistoricDebtCapacityInputs(withFra, householdTax(farm, tax)).map(async ({ key, input }) => ({ key, response: await debtCapacity(input) })));
   const sized = historic.filter((h) => h.response.status === "ok");
   const prudent = sized.reduce((a, b) => (!a || b.response.result.new_loan.max_principal < a.response.result.new_loan.max_principal ? b : a), null);
   const otherPeriod = sized.find((h) => h !== prudent)?.response.result ?? null;
@@ -107,7 +107,7 @@ export default async function FarmFinancialsPage({ searchParams }) {
         </EngineGate>
       </Card>
 
-      <MoneyBreakdown cfc={cfc} farm={farm} flatRate={flatRate?.status === "ok" ? flatRate.result : null} />
+      <MoneyBreakdown cfc={cfc} farm={farm} />
 
       {farm.profile.enterprise === "dairy" && <KpiCard response={kpi} params={params} describePath={describePath} milkBenchmarks={milkBenchmarks} milkLatest={milkLatest} milkYear={milkYear} />}
 
@@ -117,10 +117,30 @@ export default async function FarmFinancialsPage({ searchParams }) {
           year={farm.year}
           accountantTax={farm.household?.tax_per_year ?? null}
           lastYear={farm.tax?.last_year && { year: farm.tax.last_year, tax: farm.tax.last_year_tax, taxable: farm.tax.last_year_taxable_profit }}
-          yearEndGiven={farm.tax?.year_end_livestock != null || farm.tax?.year_end_stock != null}
+          herdValued={herd?.status === "ok"}
+          stockGiven={farm.tax?.year_end_stock != null}
         />
       ) : (
-        taxQuestionsLeft(farm.tax).length > 0 && <TaxQuestions year={farm.year} left={taxQuestionsLeft(farm.tax)} />
+        taxQuestionsLeft(farm).length > 0 && <TaxQuestions year={farm.year} left={taxQuestionsLeft(farm)} />
+      )}
+
+      {farm.tax?.business_type && farm.tax.business_type !== "company" && (
+        <TaxDueCard
+          payments={payments}
+          left={[...taxQuestionsLeft(farm), ...taxPaymentQuestionsLeft(farm)]}
+          thisYear={householdTax(farm, tax)}
+          taxCash={taxCash}
+          cashMonths={cf.status === "ok" ? cf.result.months : null}
+          year={farm.year}
+        />
+      )}
+
+      {herd && <HerdCard response={herd} input={inputs["herd.valuation"]} year={farm.year} />}
+
+      {recon && (
+        <ProLock pro={pro} title="Why is my cash different from my profit?" value="See how your profit turns into cash: milk paid a month late, merchant credit, herd value. What banks and accountants check first.">
+          <ReconcileCard response={recon} farm={farm} />
+        </ProLock>
       )}
 
       {risk && (
